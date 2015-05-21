@@ -87,7 +87,7 @@ public class UseCases {
 		//System.out.println("salt_mastekey: " + new BigInteger(1, salt_masterkey).toString(16));
 		//System.out.println("pubKey: " + new BigInteger(1, publicKeyByte).toString(16));
 		System.out.println("privKey: " + new BigInteger(1, privateKeyByte).toString(16));
-		System.out.println("privKeyenc: " + new BigInteger(1, privkey_user_enc).toString(16));
+		//System.out.println("privKeyenc: " + new BigInteger(1, privkey_user_enc).toString(16));
 		//System.out.println("masterkey: " + new BigInteger(1, masterkey).toString(16));
 		//System.out.println("masterkey1: " + new BigInteger(1, key.getEncoded()).toString(16));
 		//System.out.println(success);
@@ -133,7 +133,7 @@ public class UseCases {
 		
 		
 		System.out.println("privKey: " + new BigInteger(1, privkey_user).toString(16));
-		System.out.println("privKeyenc: " + new BigInteger(1, privkey_user_enc).toString(16));
+		//System.out.println("privKeyenc: " + new BigInteger(1, privkey_user_enc).toString(16));
 		
 		
 		//Logger
@@ -160,19 +160,25 @@ public class UseCases {
 	public String getPubkey(String recipientName) {
 		HttpConnection con = new HttpConnection();
 		String success = "";
+		JsonHandler jHandler = new JsonHandler();
 		try {
 			success = con.sendGet("/users/" + recipientName + "/pubkey");
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		System.out.println(success);
-		return "x";
+		String pubkey_recipient = jHandler.extraxtString(jHandler.convert(success), "public_key");
+		System.out.println(pubkey_recipient);
+		return pubkey_recipient;
 	}
 	
 	//Nachrichtenversand
-	public String sendMessage(String name, String recipientName) {
-		return "x";
+	public int sendMessage(String name, String recipientName, String nachrichtparam) {
+		String pubkey_recipient = getPubkey(recipientName);
+		String nachricht = nachrichtparam;
+		System.out.println(pubkey_recipient);
+		System.out.println(nachricht);
+		return 1;
 	}
 	
 	//Nachrichtenabruf

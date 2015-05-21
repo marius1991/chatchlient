@@ -5,12 +5,16 @@ import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.border.EmptyBorder;
 import javax.swing.JButton;
+
 import java.awt.event.ActionListener;
 import java.awt.event.ActionEvent;
+
 import javax.swing.JTextField;
 import javax.swing.JPasswordField;
 import javax.swing.JLabel;
+
 import java.awt.Color;
+
 import javax.swing.JTextPane;
 
 
@@ -184,7 +188,7 @@ public class GUI extends JFrame {
                 //Execute when button is pressed
                 System.out.println("You clicked the button login1");
                 int success = usecases.login(txtName.getText(),pwdPasswort1.getPassword());
-                System.out.println(success);
+                //System.out.println(success);
                 if (success == 1) {
             		lblSuccess1.setVisible(true);
             		txtEmpfaenger.setVisible(true);
@@ -231,7 +235,20 @@ public class GUI extends JFrame {
                 	lblFehler.setVisible(true);
                 }
             }
+            
         });
+        
+      //ActionListener für btnSend
+        btnSend.addActionListener(new ActionListener() {
+            
+            public void actionPerformed(ActionEvent e)
+            {
+                //Execute when button is pressed
+                System.out.println("You clicked the button send");
+                int success = usecases.sendMessage(txtName.getText(), txtEmpfaenger.getText(), txtpnNachricht.getText());
+
+            }
+        });    
 		
 
 	}
