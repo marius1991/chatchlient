@@ -101,25 +101,25 @@ public class GUI extends JFrame {
 		
 		final JLabel lblFehler = new JLabel("Fehler!");
 		lblFehler.setForeground(Color.RED);
-		lblFehler.setBounds(143, 209, 171, 15);
+		lblFehler.setBounds(143, 273, 171, 15);
 		contentPane.add(lblFehler);
 		lblFehler.setVisible(false);
 
 		final JLabel lblSuccess = new JLabel("Erfolgreich angemeldet");
 		lblSuccess.setForeground(Color.GREEN);
-		lblSuccess.setBounds(143, 209, 171, 15);
+		lblSuccess.setBounds(143, 273, 171, 15);
 		contentPane.add(lblSuccess);
 		lblSuccess.setVisible(false);
 		
 		final JLabel lblName = new JLabel("Name bereits vergeben");
 		lblName.setForeground(Color.RED);
-		lblName.setBounds(143, 209, 194, 15);
+		lblName.setBounds(143, 273, 194, 15);
 		contentPane.add(lblName);
 		lblName.setVisible(false);
 		
 		final JLabel lblBenutzer = new JLabel("Benutzer existiert nicht");
 		lblBenutzer.setForeground(Color.RED);
-		lblBenutzer.setBounds(143, 209, 194, 15);
+		lblBenutzer.setBounds(143, 245, 194, 15);
 		contentPane.add(lblBenutzer);
 		lblBenutzer.setVisible(false);
 		
@@ -128,6 +128,12 @@ public class GUI extends JFrame {
 		lblSuccess1.setBounds(143, 245, 171, 15);
 		contentPane.add(lblSuccess1);
 		lblSuccess1.setVisible(false);
+		
+		final JLabel lblSuccess2 = new JLabel("Versand erfolgreich!");
+		lblSuccess2.setForeground(Color.GREEN);
+		lblSuccess2.setBounds(143, 245, 171, 15);
+		contentPane.add(lblSuccess2);
+		lblSuccess2.setVisible(false);
 		
 		txtEmpfaenger = new JTextField();
 		txtEmpfaenger.setText("Empfänger");
@@ -156,7 +162,7 @@ public class GUI extends JFrame {
             public void actionPerformed(ActionEvent e)
             {
                 //Execute when button is pressed
-                System.out.println("You clicked the button register");
+                //System.out.println("You clicked the button register");
                 btnRegistrieren.setVisible(false);
                 btnLogin.setVisible(false);
                 txtBenutzername.setVisible(true);
@@ -171,7 +177,7 @@ public class GUI extends JFrame {
             public void actionPerformed(ActionEvent e)
             {
                 //Execute when button is pressed
-                System.out.println("You clicked the button login");
+                //System.out.println("You clicked the button login");
                 btnRegistrieren.setVisible(false);
                 btnLogin.setVisible(false);
                 txtName.setVisible(true);
@@ -186,9 +192,17 @@ public class GUI extends JFrame {
             public void actionPerformed(ActionEvent e)
             {
                 //Execute when button is pressed
-                System.out.println("You clicked the button login1");
+                //System.out.println("You clicked the button login1");
                 int success = usecases.login(txtName.getText(),pwdPasswort1.getPassword());
                 //System.out.println(success);
+            	lblFehler.setVisible(false);
+        		lblSuccess1.setVisible(false);
+        		lblSuccess.setVisible(false);
+        		txtEmpfaenger.setVisible(false);
+        		txtpnNachricht.setVisible(false);
+        		btnSend.setVisible(false);
+        		lblBenutzer.setVisible(false);
+            	lblFehler.setVisible(false);
                 if (success == 1) {
             		lblSuccess1.setVisible(true);
             		txtEmpfaenger.setVisible(true);
@@ -197,7 +211,6 @@ public class GUI extends JFrame {
             		txtName.setVisible(false);
                     btnLogin_1.setVisible(false);
             		pwdPasswort1.setVisible(false);
-                    lblSuccess.setVisible(false);
                 }
                 if (success == 3) {
             		lblBenutzer.setVisible(true);
@@ -214,9 +227,15 @@ public class GUI extends JFrame {
             public void actionPerformed(ActionEvent e)
             {
                 //Execute when button is pressed
-                System.out.println("You clicked the button register1");
+                //System.out.println("You clicked the button register1");
                 int success = usecases.register(txtBenutzername.getText(),pwdPasswort.getPassword());
                 //System.out.println(success);
+                txtName.setVisible(false);
+                pwdPasswort1.setVisible(false);
+                btnLogin_1.setVisible(false);
+                lblSuccess.setVisible(false);
+            	lblName.setVisible(false);
+            	lblFehler.setVisible(false);
                 if (success == 1) {
                 	txtBenutzername.setVisible(false);
                     pwdPasswort.setVisible(false);
@@ -225,8 +244,6 @@ public class GUI extends JFrame {
                     pwdPasswort1.setVisible(true);
                     btnLogin_1.setVisible(true);
                     lblSuccess.setVisible(true);
-                    lblFehler.setVisible(false);
-                    lblName.setVisible(false);
                 }
                 if (success == 3) {
                 	lblName.setVisible(true);
@@ -244,8 +261,21 @@ public class GUI extends JFrame {
             public void actionPerformed(ActionEvent e)
             {
                 //Execute when button is pressed
-                System.out.println("You clicked the button send");
+                //System.out.println("You clicked the button send");
                 int success = usecases.sendMessage(txtName.getText(), txtEmpfaenger.getText(), txtpnNachricht.getText());
+        		lblSuccess1.setVisible(false);
+        		lblSuccess2.setVisible(false);
+        		lblBenutzer.setVisible(false);
+        		lblFehler.setVisible(false);
+                if (success == 1) {
+            		lblSuccess2.setVisible(true);
+                }
+                if (success == 3) {
+            		lblBenutzer.setVisible(true);
+                }
+                if (success == 2) {
+            		lblFehler.setVisible(true);
+                }
 
             }
         });    

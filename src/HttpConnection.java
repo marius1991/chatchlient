@@ -17,24 +17,11 @@ public class HttpConnection {
 	private final String USER_AGENT = "Mozilla/5.0";
 	private final String SERVER = "http://localhost:3000";
  
-	public static void main(String[] args) throws Exception {
- 
-		//HttpConnection http = new HttpConnection();
- 
-		//System.out.println("Testing 1 - Send Http GET request");
-		//http.sendGet("http://localhost:3000/users");
- 
-		//System.out.println("\nTesting 2 - Send Http POST request");
-		//http.sendPost("http://localhost:3000/users");
- 
-	}
- 
 	// HTTP GET request
 	public String sendGet(String param_url) throws Exception {
  
 		String url = SERVER + param_url;
 
- 
 		URL obj = new URL(url);
 		HttpURLConnection con = (HttpURLConnection) obj.openConnection();
  
@@ -57,15 +44,8 @@ public class HttpConnection {
 			response.append(inputLine);
 		}
 		in.close();
- 
-		//print result
-		//System.out.println(response.toString());
-		
-		//JSONObject jsonObj = new JSONObject(subresponse.toString());
 		
 		return response.toString();
- 
-		
 	}
  
 	// HTTP POST request
@@ -84,13 +64,11 @@ public class HttpConnection {
 		con.setRequestProperty( "Content-Type","application/json" );
 		con.setRequestProperty( "Content-Length", String.valueOf(body.length()) );
  
- 
 		// Send post request
 		OutputStreamWriter writer = new OutputStreamWriter( con.getOutputStream() );
 		writer.write( body );
 		writer.flush();
 
- 
 		int responseCode = con.getResponseCode();
 		System.out.println("\nSending 'POST' request to URL : " + url);
 		//System.out.println("Post parameters : " + urlParameters);
@@ -109,7 +87,7 @@ public class HttpConnection {
 		in.close();
  
 		//print result
-		System.out.println(response.toString());
+		System.out.println("Rückgabestring: " + response.toString());
 		
 		return response.toString();
 	}
