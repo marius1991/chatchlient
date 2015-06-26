@@ -1,10 +1,14 @@
 
 import java.io.BufferedReader;
 import java.io.DataOutputStream;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.Socket;
 import java.net.URL;
+import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -16,6 +20,7 @@ public class HttpConnection {
  
 	private final String USER_AGENT = "Mozilla/5.0";
 	private final String SERVER = "http://localhost:3000";
+	private final String SERVER1 = "localhost";
  
 	// HTTP GET request
 	public String sendGet(String param_url) throws Exception {
@@ -56,7 +61,7 @@ public class HttpConnection {
 		URL obj = new URL(url);
 		HttpURLConnection con = (HttpURLConnection) obj.openConnection();
  
-		//add reuqest header
+		//add request header
 		con.setRequestMethod( "POST" );
 		con.setDoInput( true );
 		con.setDoOutput( true );
@@ -92,5 +97,38 @@ public class HttpConnection {
 		return response.toString();
 	}
 	
- 
+	public String sendGetWithBody(String param_url, String value) throws IOException {
+		String modifiedSentence;
+		String result = "";
+		Socket clientSocket = new Socket(SERVER1, 3000);
+		DataOutputStream outToServer = new DataOutputStream(clientSocket.getOutputStream());
+		BufferedReader inFromServer = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+		String content = value;
+		outToServer.writeBytes("GET " + SERVER1 + param_url + " HTTP/1.1" + "\n" +
+		"Host: " + SERVER1 + "\n" +
+		"Content-Type: application/json" + "\n" +
+		"Content-Length: " + content.length() + "\n" +
+		"\n" +
+		content
+		);
+//        while ((modifiedSentence = inFromServer.readLine()) != null) {
+//        	//System.out.println("FROM SERVER: " + modifiedSentence);
+//        	if(modifiedSentence.startsWith("[")) {
+//        		result = modifiedSentence;
+//        	}
+//        }
+        StringBuilder reply = new StringBuilder();
+
+        while ((modifiedSentence = inFromServer.readLine()) != null) {
+        	if(modifiedSentence.startsWith("[")) {
+        		reply.append(modifiedSentence);
+        	}
+        }
+        inFromServer.close();
+        
+		clientSocket.close();
+		
+		System.out.println(reply.toString());
+        return reply.toString();
+    }
 }

@@ -1,5 +1,7 @@
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.Key;
@@ -13,9 +15,9 @@ import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
-import java.security.spec.RSAPrivateKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 
 import javax.crypto.BadPaddingException;
@@ -39,7 +41,7 @@ public class UseCases {
 
 	//Registrierung
 	public int register(String name, char[] password) {
-		
+		privkey_user = null;
 		System.out.println("------------Registrierung------------");
 		System.out.println("");
 
@@ -110,6 +112,7 @@ public class UseCases {
 	
 	//Anmeldung
 	public int login(String name, char[] password) {
+		privkey_user = null;
 		System.out.println("");
 		System.out.println("------------Anmeldung------------");
 
@@ -122,12 +125,11 @@ public class UseCases {
 			// Auto-generated catch block
 			e.printStackTrace();
 		}
-		System.out.println("ÜbergabeString: " + success);
+		System.out.println("Rückgabe: " + success);
 		
 		//String in JSON umwandeln und Daten extrahieren
 		JsonHandler jHandler = new JsonHandler();	
 		String salt_masterkeyString = jHandler.extraxtString(jHandler.convert(success), "salt_master_key");
-		String pubkey_userString = jHandler.extraxtString(jHandler.convert(success), "public_key");
 		String privkey_user_encString = jHandler.extraxtString(jHandler.convert(success), "private_key_enc");
 		byte[] salt_masterkey = DatatypeConverter.parseHexBinary(salt_masterkeyString);
 		byte[] privkey_user_enc = DatatypeConverter.parseHexBinary(privkey_user_encString);		
@@ -164,6 +166,7 @@ public class UseCases {
 			// Auto-generated catch block
 			e.printStackTrace();
 		}
+		System.out.println("Rückgabe: " + success);
 		if (jHandler.extraxtString(jHandler.convert(success), "public_key").equals("")) {
 			String status = jHandler.extraxtString(jHandler.convert(success), "status");
 			return status;
@@ -187,10 +190,13 @@ public class UseCases {
 			return 3;
 		}
 		else {
+			System.out.println("");
+			System.out.println("------------Nachrichtenversand------------");
+			System.out.println("");
 			byte[] nachricht = nachrichtparam.getBytes();
 			byte[] pubkey_recipient = DatatypeConverter.parseHexBinary(status);
 //			System.out.println("PublicKey von " + recipientName + ": " + status);
-//			System.out.println("Nachricht: " + nachrichtparam);
+			System.out.println("Nachricht: " + new String(nachricht));
 			
 			//Symmetrischen Schlüssel bilden
 			KeyGenerator kg = null;
@@ -214,6 +220,7 @@ public class UseCases {
 
 			//Nachricht verschlüsseln
 			byte[] cipher = encryptAESCBC(nachricht, pubkey_recipient, iv, key_recipient_secret);
+			System.out.println("cipher: " + DatatypeConverter.printHexBinary(cipher));
 			
 			//key_recipient mit Public Key verschlüsseln
 			byte[] key_recipient_enc = encryptRSAPubKey(pubkey_recipient, key_recipient);
@@ -261,6 +268,7 @@ public class UseCases {
 			System.out.println("-sig_service_enc64: " + sig_service_enc64);
 			
 			String value = "{\"name\":\"" +name+ "\",\"cipher\":\"" +new BigInteger(1, cipher).toString(16)+ "\",\"iv\":\"" +new BigInteger(1, iv).toString(16)+ "\",\"key_recipient_enc\":\"" +new BigInteger(1, key_recipient_enc).toString(16)+ "\",\"sig_recipient\":\"" +new BigInteger(1, sig_recipient_enc).toString(16)+ "\",\"timestamp\":\"" +timestamp+ "\",\"recipientname\":\"" +recipientName+ "\",\"sig_service\":\"" +sig_service_enc64+ "\"}";
+			System.out.println("ÜbergabeString: " + value);
 			
 			//Verbindung zum Server herstellen
 			HttpConnection con = new HttpConnection();
@@ -271,16 +279,78 @@ public class UseCases {
 				// Auto-generated catch block
 				e.printStackTrace();
 			}
-			
-			//System.out.println(success);
+
 			
 			return 1;
 		}
 	}
 	
 	//Nachrichtenabruf
-	public String receiveMessage(String name) {
-		return "x";
+	public ArrayList<String[]> receiveMessage(String name) {
+		System.out.println("");
+		System.out.println("------------Nachrichtenabruf------------");
+		System.out.println("");
+		//Unix-Zeit
+		Long unixTime = System.currentTimeMillis() / 1000L;
+		String timestamp = unixTime.toString();
+		//System.out.println("Timestamp: " + timestamp);
+		
+		//SHA256 Hash bilden
+		String text = name + timestamp;
+		byte [] textBytes = text.getBytes();
+		MessageDigest md = null;
+		try {
+			md = MessageDigest.getInstance("SHA-256");
+		} catch (NoSuchAlgorithmException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		md.update(textBytes); // Change this to "UTF-16" if needed
+		byte[] signature = md.digest();
+		
+		//Verschlüsselung des Hashes mit dem Private Key
+		byte[] signature_enc = encryptRSAPrivKey(privkey_user, signature);
+		System.out.println("-signature: " + new BigInteger(1, signature_enc).toString(16));
+		String signature_enc64 = new String(DatatypeConverter.printBase64Binary(signature_enc));
+		System.out.println("-signature_enc64: " + signature_enc64);
+	
+		//Verbindung zum Server herstellen
+		String success = "";
+		JsonHandler jHandler = new JsonHandler();
+		String value = "{\"timestamp\":\"" + timestamp + "\",\"signature\":\"" + signature_enc64 + "\"}";
+		System.out.println(value);
+		String url = "/users/" + name + "/messages";
+		HttpConnection http = new HttpConnection();
+		try {
+			success = http.sendGetWithBody(url, value);
+		} catch (IOException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+		System.out.println(success);
+		String json = success.substring(1, success.length()-1);
+		
+		String sender = jHandler.extraxtString(jHandler.convert(json), "name");
+		String key_recipient_encString = jHandler.extraxtString(jHandler.convert(json), "key_recipient_enc");
+		String cipherString = jHandler.extraxtString(jHandler.convert(json), "cipher");
+		String ivString = jHandler.extraxtString(jHandler.convert(json), "iv");
+		byte[] key_recipient_enc = DatatypeConverter.parseHexBinary(key_recipient_encString);
+		byte[] cipher = DatatypeConverter.parseHexBinary(cipherString);
+		byte[] iv = DatatypeConverter.parseHexBinary(ivString);
+		System.out.println("key_recipient_enc: " + key_recipient_encString);
+		System.out.println("cipher: " + cipherString);
+		System.out.println("iv: " + ivString);
+
+		//key_recipient_enc entschlüsseln
+		byte[] key_recipient = decryptRSAPrivKey(privkey_user, key_recipient_enc);
+		System.out.println("key_recipient: " + DatatypeConverter.printHexBinary(key_recipient));
+		
+		byte[] nachricht = decryptAESCBC(cipher, key_recipient, iv);
+		System.out.println("Nachricht: " + new String(nachricht));
+		String message[] = {sender,new String(nachricht)};
+		ArrayList<String[]> messages = new ArrayList<>();
+		messages.add(message);
+		return messages;
 	}
 	
 	//User anzeigen
@@ -381,6 +451,33 @@ public class UseCases {
 		return cipher;		
 	}
 	
+	//AESCBC Funktion decrypt
+		public byte[] decryptAESCBC (byte[] cipher, byte[] key_recipient, byte[] iv) {
+			IvParameterSpec ivspec = new IvParameterSpec(iv);
+			SecretKeySpec key = new SecretKeySpec(key_recipient, "AES");
+			Cipher c = null;
+			try {
+				c = Cipher.getInstance("AES/CBC/PKCS5Padding");
+			} catch (NoSuchAlgorithmException | NoSuchPaddingException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			try {
+				c.init(Cipher.DECRYPT_MODE, key, ivspec);
+			} catch (InvalidKeyException | InvalidAlgorithmParameterException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			byte[] nachricht = null;
+			try {
+				nachricht = c.doFinal(cipher);
+			} catch (IllegalBlockSizeException | BadPaddingException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			return nachricht;		
+		}
+	
 	//RSA Verschlüsselung mit Public Key
 	public byte[] encryptRSAPubKey (byte[] pubkey, byte[] text) {
 		PublicKey publicKey = null;
@@ -443,5 +540,37 @@ public class UseCases {
 			e.printStackTrace();
 		}
 		return text_enc;
+	}
+	
+	//RSA Entschlüsselung mit Private Key
+	public byte[] decryptRSAPrivKey (byte[] privkey, byte[] key_recipient_enc) {
+		PrivateKey privKey = null;
+		try {
+			privKey = KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(privkey));
+		} catch (InvalidKeySpecException | NoSuchAlgorithmException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+		Cipher c = null;
+		try {
+			c = Cipher.getInstance("RSA");
+		} catch (NoSuchAlgorithmException | NoSuchPaddingException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		try {
+			c.init(Cipher.DECRYPT_MODE, privKey);
+		} catch (InvalidKeyException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		byte[] text_dec = null;
+		try {
+			text_dec = c.doFinal(key_recipient_enc);
+		} catch (IllegalBlockSizeException | BadPaddingException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return text_dec;
 	}
 }

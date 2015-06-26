@@ -14,6 +14,8 @@ import javax.swing.JPasswordField;
 import javax.swing.JLabel;
 
 import java.awt.Color;
+import java.io.IOException;
+import java.util.ArrayList;
 
 import javax.swing.JTextPane;
 
@@ -27,6 +29,7 @@ public class GUI extends JFrame {
 	private JPasswordField pwdPasswort1;
 	private UseCases usecases = new UseCases();
 	private JTextField txtEmpfaenger;
+	private JTextField txtAbsender;
 
 	/**
 	 * Launch the application.
@@ -137,21 +140,52 @@ public class GUI extends JFrame {
 		
 		txtEmpfaenger = new JTextField();
 		txtEmpfaenger.setText("Empfänger");
-		txtEmpfaenger.setBounds(50, 66, 114, 19);
+		txtEmpfaenger.setBounds(69, 34, 114, 19);
 		contentPane.add(txtEmpfaenger);
 		txtEmpfaenger.setColumns(10);
 		txtEmpfaenger.setVisible(false);
 		
 		final JTextPane txtpnNachricht = new JTextPane();
 		txtpnNachricht.setText("Nachricht");
-		txtpnNachricht.setBounds(50, 116, 158, 125);
+		txtpnNachricht.setBounds(60, 66, 144, 125);
 		contentPane.add(txtpnNachricht);
 		txtpnNachricht.setVisible(false);
 		
 		final JButton btnSend = new JButton("Send");
-		btnSend.setBounds(244, 209, 117, 25);
+		btnSend.setBounds(70, 208, 117, 25);
 		contentPane.add(btnSend);
 		btnSend.setVisible(false);
+		
+		final JButton btnAbrufen = new JButton("Abrufen");
+		btnAbrufen.setBounds(272, 63, 117, 25);
+		contentPane.add(btnAbrufen);
+		btnAbrufen.setVisible(false);
+		
+		txtAbsender = new JTextField();
+		txtAbsender.setText("Absender");
+		txtAbsender.setBounds(272, 115, 114, 19);
+		contentPane.add(txtAbsender);
+		txtAbsender.setColumns(10);
+		txtAbsender.setVisible(false);
+		
+		final JTextPane txtpnEmpfnachricht = new JTextPane();
+		txtpnEmpfnachricht.setText("EmpfNachricht");
+		txtpnEmpfnachricht.setBounds(272, 149, 125, 70);
+		contentPane.add(txtpnEmpfnachricht);
+		txtpnEmpfnachricht.setVisible(false);
+		
+		final JLabel lblVon = new JLabel("Von:");
+		lblVon.setBounds(272, 102, 70, 15);
+		contentPane.add(lblVon);
+		lblVon.setVisible(false);
+		
+		final JButton btnLogout = new JButton("Logout");
+		btnLogout.setBounds(321, 0, 117, 25);
+		contentPane.add(btnLogout);
+		btnLogout.setVisible(false);
+
+
+
 
 
 		
@@ -211,6 +245,11 @@ public class GUI extends JFrame {
             		txtName.setVisible(false);
                     btnLogin_1.setVisible(false);
             		pwdPasswort1.setVisible(false);
+            		btnAbrufen.setVisible(true);
+            		txtAbsender.setVisible(true);
+            		txtpnEmpfnachricht.setVisible(true);
+            		lblVon.setVisible(true);
+            		btnLogout.setVisible(true);
                 }
                 if (success == 3) {
             		lblBenutzer.setVisible(true);
@@ -280,6 +319,40 @@ public class GUI extends JFrame {
             }
         });    
 		
-
+        //ActionListerner für btnLogout
+        btnLogout.addActionListener(new ActionListener() {
+            
+            public void actionPerformed(ActionEvent e)
+            {
+                //Execute when button is pressed
+                //System.out.println("You clicked the button Logout");
+        		lblSuccess1.setVisible(false);
+        		txtEmpfaenger.setVisible(false);
+        		txtpnNachricht.setVisible(false);
+        		btnSend.setVisible(false);
+        		btnAbrufen.setVisible(false);
+        		txtAbsender.setVisible(false);
+        		txtpnEmpfnachricht.setVisible(false);
+        		lblVon.setVisible(false);
+        		btnLogout.setVisible(false);
+        		btnRegistrieren.setVisible(true);
+        		btnLogin.setVisible(true);
+            }
+        });   
+        
+      //ActionListerner für btnLogout
+        btnAbrufen.addActionListener(new ActionListener() {
+            
+            public void actionPerformed(ActionEvent e)
+            {
+            	//Execute when button is pressed
+                System.out.println("You clicked the button Abrufen");
+                ArrayList<String[]> messages = usecases.receiveMessage(txtName.getText());
+                txtAbsender.setText(messages.get(0)[0]);
+        		txtpnEmpfnachricht.setText(messages.get(0)[1]);
+            }
+        });
+       
+        
 	}
 }
