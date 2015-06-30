@@ -251,10 +251,7 @@ public class GUI extends JFrame {
             		lblVon.setVisible(true);
             		btnLogout.setVisible(true);
                 }
-                if (success == 3) {
-            		lblBenutzer.setVisible(true);
-                }
-                if (success == 2) {
+                else {
                 	lblFehler.setVisible(true);
                 }
             }
@@ -284,10 +281,7 @@ public class GUI extends JFrame {
                     btnLogin_1.setVisible(true);
                     lblSuccess.setVisible(true);
                 }
-                if (success == 3) {
-                	lblName.setVisible(true);
-                }
-                if (success == 2) {
+                else {
                 	lblFehler.setVisible(true);
                 }
             }
@@ -309,10 +303,7 @@ public class GUI extends JFrame {
                 if (success == 1) {
             		lblSuccess2.setVisible(true);
                 }
-                if (success == 3) {
-            		lblBenutzer.setVisible(true);
-                }
-                if (success == 2) {
+                else {
             		lblFehler.setVisible(true);
                 }
 
