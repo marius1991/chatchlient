@@ -1,0 +1,584 @@
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
+import java.security.Key;
+import java.security.KeyFactory;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.SecureRandom;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.X509EncodedKeySpec;
+import java.util.ArrayList;
+import java.util.Random;
+
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.KeyGenerator;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+import javax.xml.bind.DatatypeConverter;
+
+import org.bouncycastle.crypto.digests.SHA256Digest;
+import org.bouncycastle.crypto.generators.PKCS5S2ParametersGenerator;
+import org.bouncycastle.crypto.params.KeyParameter;
+
+
+public class UseCases {
+	
+	private byte[] privkey_user = null;
+
+	//Registrierung
+	public int register(String name, char[] password) {
+		privkey_user = null;
+		System.out.println("------------Registrierung------------");
+		System.out.println("");
+
+		//salt_masterkey bilden
+		final Random r = new SecureRandom();
+		byte[] salt_masterkey = new byte[64];
+		r.nextBytes(salt_masterkey);
+
+		//Aufruf PBKDF2 Funktion um masterkey aus password und salt_masterkey zu bilden
+		byte[] masterkey = pbkf2(password, salt_masterkey);
+		
+		//KeyPair bilden
+		KeyPairGenerator kpg = null;
+		//KeyPairGenerator erzeugen --> Algorithmus: RSA 2048
+		try {
+			kpg = KeyPairGenerator.getInstance("RSA");
+		} catch (NoSuchAlgorithmException e) {
+			// Auto-generated catch block
+			e.printStackTrace();
+		}
+		SecureRandom securerandom = new SecureRandom();
+	    byte bytes[] = new byte[20];
+	    securerandom.nextBytes(bytes);
+		kpg.initialize(2048, securerandom);
+		
+		//KeyPair erzeugen
+		KeyPair kp = kpg.genKeyPair();
+		
+		//publickey und privatekey in Variablen speichern
+		Key pubkey_user = kp.getPublic();
+		Key privkey_user = kp.getPrivate();
+		byte[] privateKeyByte = privkey_user.getEncoded();
+		byte[] publicKeyByte = pubkey_user.getEncoded();
+		String publickey64 = new String(DatatypeConverter.printBase64Binary(publicKeyByte));
+		
+		//privkey_user zu privkey_user_enc verschlüsseln
+		byte[] privkey_user_enc = encryptAESECB(masterkey, privateKeyByte);
+		
+		String value = "{\"name\":\"" +name+ "\",\"salt_master_key\":\"" + DatatypeConverter.printHexBinary(salt_masterkey).toLowerCase() + "\",\"public_key\":\"" +publickey64+ "\",\"private_key_enc\":\"" + DatatypeConverter.printHexBinary(privkey_user_enc).toLowerCase() + "\"}";
+		System.out.println(value);
+		
+		//Verbindung zum Server herstellen
+		HttpConnection con = new HttpConnection();
+		String success = "";
+		try {
+			success = con.sendPost("/users", value);
+		} catch (Exception e) {
+			// Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		//Logausgabe
+		System.out.println("Übergabestring: " + value);
+		System.out.println("PrivateKey vor der Verschlüsselung: " + DatatypeConverter.printHexBinary(privateKeyByte).toLowerCase());
+		System.out.println("PrivateKey nach der Verschlüsselung: " + DatatypeConverter.printHexBinary(privkey_user_enc).toLowerCase());
+		
+		//Rückgabe eines Statuscodes
+		if(success.equals("{\"status\":\"1\"}")) {
+			return 1;
+		}
+		if(success.equals("{\"status\":\"3\"}"))	{
+			return 3;
+		}
+		else {
+			return 2;
+		}
+	}
+	
+	//Anmeldung
+	public int login(String name, char[] password) {
+		privkey_user = null;
+		System.out.println("");
+		System.out.println("------------Anmeldung------------");
+
+		//Verbindung zum Server herstellen
+		HttpConnection con = new HttpConnection();
+		String success = "";
+		try {
+			success = con.sendGet("/users/"+name);
+		} catch (Exception e) {
+			// Auto-generated catch block
+			e.printStackTrace();
+		}
+		System.out.println("Rückgabe: " + success);
+		
+		//String in JSON umwandeln und Daten extrahieren
+		JsonHandler jHandler = new JsonHandler();	
+		String salt_masterkeyString = jHandler.extraxtString(jHandler.convert(success), "salt_master_key");
+		String privkey_user_encString = jHandler.extraxtString(jHandler.convert(success), "private_key_enc");
+		byte[] salt_masterkey = DatatypeConverter.parseHexBinary(salt_masterkeyString);
+		byte[] privkey_user_enc = DatatypeConverter.parseHexBinary(privkey_user_encString);		
+		byte[] masterkey = pbkf2(password, salt_masterkey);	
+		privkey_user = decryptAESECB(masterkey, privkey_user_enc);
+		
+		//Logausgabe
+		System.out.println("PrivateKey vor der Entschlüsselung: " + DatatypeConverter.printHexBinary(privkey_user_enc).toLowerCase());
+		System.out.println("PrivateKey nach der Entschlüsslung: " + DatatypeConverter.printHexBinary(privkey_user).toLowerCase());
+		
+		//Rückgabe eines Statuscodes
+		if(success.equals("{\"status\":\"2\"}")) {
+			return 2;
+		}
+		if(success.equals("{\"status\":\"3\"}"))	{
+			return 3;
+		}
+		else {
+			return 1;
+		}
+	}
+	
+	//Public Key anfordern
+	public String getPubkey(String recipientName) {
+		System.out.println("");
+		System.out.println("------------Pubkey anforden------------");
+		//Verbindung zum Server herstellen
+		HttpConnection con = new HttpConnection();
+		String success = "";
+		JsonHandler jHandler = new JsonHandler();
+		try {
+			success = con.sendGet("/users/" + recipientName + "/pubkey");
+		} catch (Exception e) {
+			// Auto-generated catch block
+			e.printStackTrace();
+		}
+		System.out.println("Rückgabe: " + success);
+		if (jHandler.extraxtString(jHandler.convert(success), "public_key").equals("")) {
+			String status = jHandler.extraxtString(jHandler.convert(success), "status");
+			return status;
+		}
+		else {
+			String pubkey_recipient = jHandler.extraxtString(jHandler.convert(success), "public_key");
+			byte[] b = DatatypeConverter.parseBase64Binary(pubkey_recipient);
+			return DatatypeConverter.printHexBinary(b).toLowerCase();
+		}
+	}
+	
+	//Nachrichtenversand
+	public int sendMessage(String name, String recipientName, String nachrichtparam) {	
+		String status = getPubkey(recipientName); 
+		if (status.equals("2")) {
+			System.out.println("Sonstiger Fehler");
+			return 2;
+		}
+		if (status.equals("3")) {
+			System.out.println("Empfänger Existiert nicht");
+			return 3;
+		}
+		else {
+			System.out.println("");
+			System.out.println("------------Nachrichtenversand------------");
+			System.out.println("");
+			byte[] nachricht = nachrichtparam.getBytes();
+			byte[] pubkey_recipient = DatatypeConverter.parseHexBinary(status);
+//			System.out.println("PublicKey von " + recipientName + ": " + status);
+			System.out.println("Nachricht: " + new String(nachricht));
+			
+			//Symmetrischen Schlüssel bilden
+			KeyGenerator kg = null;
+			try {
+				kg = KeyGenerator.getInstance("AES");
+			} catch (NoSuchAlgorithmException e) {
+				// Auto-generated catch block
+				e.printStackTrace();
+			}
+			SecureRandom securerandom = new SecureRandom();
+		    byte bytes[] = new byte[20];
+		    securerandom.nextBytes(bytes);
+			kg.init(128, securerandom);
+			SecretKey key_recipient_secret = kg.generateKey();
+			byte[] key_recipient = key_recipient_secret.getEncoded();
+			
+			//Initialisierungsvektor erzeugen
+			final Random r = new SecureRandom();
+			byte[] iv = new byte[16];
+			r.nextBytes(iv);
+
+			//Nachricht verschlüsseln
+			byte[] cipher = encryptAESCBC(nachricht, pubkey_recipient, iv, key_recipient_secret);
+			System.out.println("cipher: " + DatatypeConverter.printHexBinary(cipher).toLowerCase());
+			
+			//key_recipient mit Public Key verschlüsseln
+			byte[] key_recipient_enc = encryptRSAPubKey(pubkey_recipient, key_recipient);
+			
+			//Bildung von SHA-256 Hash für sig_recipient
+			String text = name + DatatypeConverter.printHexBinary(cipher).toLowerCase() + DatatypeConverter.printHexBinary(iv).toLowerCase() + DatatypeConverter.printHexBinary(key_recipient_enc).toLowerCase();
+			byte [] textBytes = text.getBytes();
+			
+			MessageDigest md = null;
+			try {
+				md = MessageDigest.getInstance("SHA-256");
+			} catch (NoSuchAlgorithmException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			md.update(textBytes); // Change this to "UTF-16" if needed
+			byte[] sig_recipient = md.digest();
+			System.out.println("-sig_recipient: " + DatatypeConverter.printHexBinary(sig_recipient).toLowerCase());
+			//Verschlüsselung des Hashes mit dem Private Key
+			byte[] sig_recipient_enc = encryptRSAPrivKey(privkey_user, sig_recipient);
+			System.out.println("-sig_recipient_enc: " + DatatypeConverter.printHexBinary(sig_recipient_enc).toLowerCase());
+			
+			//Unix-Zeit
+			Long unixTime = System.currentTimeMillis() / 1000L;
+			String timestamp = unixTime.toString();
+			//System.out.println("Timestamp: " + timestamp);
+			
+			//Bildung von SHA-256 Hash für sig_service
+			String text1 = timestamp + recipientName + name + DatatypeConverter.printHexBinary(cipher).toLowerCase() + DatatypeConverter.printHexBinary(iv).toLowerCase() + DatatypeConverter.printHexBinary(key_recipient_enc).toLowerCase() + DatatypeConverter.printHexBinary(sig_recipient_enc).toLowerCase();
+			byte [] text1Bytes = text1.getBytes();
+			MessageDigest md1 = null;
+			try {
+				md1 = MessageDigest.getInstance("SHA-256");
+			} catch (NoSuchAlgorithmException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			md1.update(text1Bytes); // Change this to "UTF-16" if needed
+			byte[] sig_service = md1.digest();
+			String hexSig_service = DatatypeConverter.printHexBinary(sig_service).toLowerCase();
+			System.out.println("HEX: " + hexSig_service);
+			
+			//Verschlüsselung des Hashes mit dem Private Key
+			byte[] sig_service_enc = encryptRSAPrivKey(privkey_user, hexSig_service.getBytes());
+			System.out.println("-sig_service: " + DatatypeConverter.printHexBinary(sig_service_enc).toLowerCase());
+			String sig_service_enc64 = new String(DatatypeConverter.printBase64Binary(sig_service_enc));
+			System.out.println("-sig_service_enc64: " + sig_service_enc64);
+			
+			String value = "{\"name\":\"" +name+ "\",\"cipher\":\"" + DatatypeConverter.printHexBinary(cipher).toLowerCase() + "\",\"iv\":\"" + DatatypeConverter.printHexBinary(iv).toLowerCase() + "\",\"key_recipient_enc\":\"" + DatatypeConverter.printHexBinary(key_recipient_enc).toLowerCase() + "\",\"sig_recipient\":\"" + DatatypeConverter.printHexBinary(sig_recipient_enc).toLowerCase() + "\",\"timestamp\":\"" +timestamp+ "\",\"recipientname\":\"" +recipientName+ "\",\"sig_service\":\"" +sig_service_enc64+ "\"}";
+			System.out.println("ÜbergabeString: " + value);
+			
+			//Verbindung zum Server herstellen
+			HttpConnection con = new HttpConnection();
+			String success = "";
+			try {
+				success = con.sendPost("/messages", value);
+			} catch (Exception e) {
+				// Auto-generated catch block
+				e.printStackTrace();
+			}
+
+			
+			return 1;
+		}
+	}
+	
+	//Nachrichtenabruf
+	public ArrayList<String[]> receiveMessage(String name) {
+		System.out.println("");
+		System.out.println("------------Nachrichtenabruf------------");
+		System.out.println("");
+		//Unix-Zeit
+		Long unixTime = System.currentTimeMillis() / 1000L;
+		String timestamp = unixTime.toString();
+		//System.out.println("Timestamp: " + timestamp);
+		
+		//SHA256 Hash bilden
+		String text = name + timestamp;
+		System.out.println("STRING: " + text);
+		byte [] textBytes = text.getBytes();
+		MessageDigest md = null;
+		try {
+			md = MessageDigest.getInstance("SHA-256");
+		} catch (NoSuchAlgorithmException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		md.update(textBytes); // Change this to "UTF-16" if needed
+		byte[] signature = md.digest();
+		String hexSignature = DatatypeConverter.printHexBinary(signature).toLowerCase();
+		System.out.println("HEX: " + hexSignature);
+		
+		//Verschlüsselung des Hashes mit dem Private Key
+		byte[] signature_enc = encryptRSAPrivKey(privkey_user, hexSignature.getBytes());
+		System.out.println("-signature: " + DatatypeConverter.printHexBinary(signature_enc).toLowerCase());
+		String signature_enc64 = new String(DatatypeConverter.printBase64Binary(signature_enc));
+		System.out.println("-signature_enc64: " + signature_enc64);
+	
+		//Verbindung zum Server herstellen
+		String success = "";
+		JsonHandler jHandler = new JsonHandler();
+		String value = "{\"timestamp\":\"" + timestamp + "\",\"signature\":\"" + signature_enc64 + "\"}";
+		System.out.println(value);
+		String url = "/users/" + name + "/messages";
+		HttpConnection http = new HttpConnection();
+		try {
+			success = http.sendGetWithBody(url, value);
+		} catch (IOException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+		System.out.println(success);
+		String json = null;
+		if(success.substring(0, 1).equals("[")) {
+			json = success.substring(1, success.length()-1);
+		}
+		else {
+			json = success;
+		}
+		
+		String sender = jHandler.extraxtString(jHandler.convert(json), "name");
+		String key_recipient_encString = jHandler.extraxtString(jHandler.convert(json), "key_recipient_enc");
+		String cipherString = jHandler.extraxtString(jHandler.convert(json), "cipher");
+		String ivString = jHandler.extraxtString(jHandler.convert(json), "iv");
+		byte[] key_recipient_enc = DatatypeConverter.parseHexBinary(key_recipient_encString);
+		byte[] cipher = DatatypeConverter.parseHexBinary(cipherString);
+		byte[] iv = DatatypeConverter.parseHexBinary(ivString);
+		System.out.println("key_recipient_enc: " + key_recipient_encString);
+		System.out.println("cipher: " + cipherString);
+		System.out.println("iv: " + ivString);
+
+		//key_recipient_enc entschlüsseln
+		byte[] key_recipient = decryptRSAPrivKey(privkey_user, key_recipient_enc);
+		System.out.println("key_recipient: " + DatatypeConverter.printHexBinary(key_recipient).toLowerCase());
+		
+		byte[] nachricht = decryptAESCBC(cipher, key_recipient, iv);
+		System.out.println("Nachricht: " + new String(nachricht));
+		String message[] = {sender,new String(nachricht)};
+		ArrayList<String[]> messages = new ArrayList<>();
+		messages.add(message);
+		return messages;
+	}
+	
+	//User anzeigen
+	public ArrayList<String> showUsers() {
+		ArrayList<String> x = new ArrayList<>();
+		return x;
+	}
+	
+	//pbkf2 Funktion
+	public byte[] pbkf2(char[] password, byte[]salt) {
+		PKCS5S2ParametersGenerator gen = new PKCS5S2ParametersGenerator(new SHA256Digest());
+		try {
+			gen.init(new String(password).getBytes("UTF-8"), salt, 10000);
+		} catch (UnsupportedEncodingException e) {
+			// Auto-generated catch block
+			e.printStackTrace();
+		}
+		byte[] masterkey = ((KeyParameter) gen.generateDerivedParameters(256)).getKey();
+		
+		return masterkey;
+	}
+	
+	//AESECB Funktion encrypt
+	public byte[] encryptAESECB(byte[] masterkey, byte[] privateKeyByte) {
+		SecretKeySpec key = new SecretKeySpec(masterkey, "AES");
+		Cipher cipher = null;
+		try {
+			cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+		} catch (NoSuchAlgorithmException | NoSuchPaddingException e1) {
+			// Auto-generated catch block
+			e1.printStackTrace();
+		}
+		try {
+			cipher.init(Cipher.ENCRYPT_MODE, key);
+		} catch (InvalidKeyException e) {
+			// Auto-generated catch block
+			e.printStackTrace();
+		}
+		byte[] privkey_user_enc = null;
+		try {
+			privkey_user_enc = cipher.doFinal(privateKeyByte);
+		} catch (IllegalBlockSizeException | BadPaddingException e) {
+			// Auto-generated catch block
+			e.printStackTrace();
+		}
+		return privkey_user_enc;
+	}
+	
+	//AESECB Funktion decrypt
+	public byte[] decryptAESECB (byte[] masterkey, byte[] privkey_user_enc) {
+		SecretKeySpec key = new SecretKeySpec(masterkey, "AES");
+		Cipher cipher = null;
+		try {
+			cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+		} catch (NoSuchAlgorithmException | NoSuchPaddingException e1) {
+			// Auto-generated catch block
+			e1.printStackTrace();
+		}
+		try {
+			cipher.init(Cipher.DECRYPT_MODE, key);
+		} catch (InvalidKeyException e) {
+			// Auto-generated catch block
+			e.printStackTrace();
+		}
+		byte[] privkey_user = null;
+		try {
+			privkey_user = cipher.doFinal(privkey_user_enc);
+		} catch (IllegalBlockSizeException | BadPaddingException e) {
+			// Auto-generated catch block
+			e.printStackTrace();
+		}
+		return privkey_user;
+	}
+	
+	//AESCBC Funktion encrypt
+	public byte[] encryptAESCBC (byte[] nachricht, byte[] pubkey_recipient, byte[] iv, SecretKey key_recipient) {
+		IvParameterSpec ivspec = new IvParameterSpec(iv);
+		Cipher c = null;
+		try {
+			c = Cipher.getInstance("AES/CBC/PKCS5Padding");
+		} catch (NoSuchAlgorithmException | NoSuchPaddingException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		try {
+			c.init(Cipher.ENCRYPT_MODE, key_recipient, ivspec);
+		} catch (InvalidKeyException | InvalidAlgorithmParameterException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		byte[] cipher = null;
+		try {
+			cipher = c.doFinal(nachricht);
+		} catch (IllegalBlockSizeException | BadPaddingException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return cipher;		
+	}
+	
+	//AESCBC Funktion decrypt
+		public byte[] decryptAESCBC (byte[] cipher, byte[] key_recipient, byte[] iv) {
+			IvParameterSpec ivspec = new IvParameterSpec(iv);
+			SecretKeySpec key = new SecretKeySpec(key_recipient, "AES");
+			Cipher c = null;
+			try {
+				c = Cipher.getInstance("AES/CBC/PKCS5Padding");
+			} catch (NoSuchAlgorithmException | NoSuchPaddingException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			try {
+				c.init(Cipher.DECRYPT_MODE, key, ivspec);
+			} catch (InvalidKeyException | InvalidAlgorithmParameterException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			byte[] nachricht = null;
+			try {
+				nachricht = c.doFinal(cipher);
+			} catch (IllegalBlockSizeException | BadPaddingException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			return nachricht;		
+		}
+	
+	//RSA Verschlüsselung mit Public Key
+	public byte[] encryptRSAPubKey (byte[] pubkey, byte[] text) {
+		PublicKey publicKey = null;
+		try {
+			publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(pubkey));
+		} catch (InvalidKeySpecException | NoSuchAlgorithmException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+		Cipher c = null;
+		try {
+			c = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+		} catch (NoSuchAlgorithmException | NoSuchPaddingException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		try {
+			c.init(Cipher.ENCRYPT_MODE, publicKey);
+		} catch (InvalidKeyException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		byte[] text_enc = null;
+		try {
+			text_enc = c.doFinal(text);
+		} catch (IllegalBlockSizeException | BadPaddingException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return text_enc;
+	}
+	
+	//RSA Verschlüsselung mit Private Key
+	public byte[] encryptRSAPrivKey (byte[] privkey, byte[] text) {
+		PrivateKey privKey = null;
+		try {
+			privKey = KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(privkey));
+		} catch (InvalidKeySpecException | NoSuchAlgorithmException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+		Cipher c = null;
+		try {
+			c = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+		} catch (NoSuchAlgorithmException | NoSuchPaddingException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		try {
+			c.init(Cipher.ENCRYPT_MODE, privKey);
+		} catch (InvalidKeyException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		byte[] text_enc = null;
+		try {
+			text_enc = c.doFinal(text);
+		} catch (IllegalBlockSizeException | BadPaddingException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return text_enc;
+	}
+	
+	//RSA Entschlüsselung mit Private Key
+	public byte[] decryptRSAPrivKey (byte[] privkey, byte[] key_recipient_enc) {
+		PrivateKey privKey = null;
+		try {
+			privKey = KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(privkey));
+		} catch (InvalidKeySpecException | NoSuchAlgorithmException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+		Cipher c = null;
+		try {
+			c = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+		} catch (NoSuchAlgorithmException | NoSuchPaddingException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		try {
+			c.init(Cipher.DECRYPT_MODE, privKey);
+		} catch (InvalidKeyException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		byte[] text_dec = null;
+		try {
+			text_dec = c.doFinal(key_recipient_enc);
+		} catch (IllegalBlockSizeException | BadPaddingException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return text_dec;
+	}
+}
