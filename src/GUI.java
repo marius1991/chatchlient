@@ -1,22 +1,15 @@
-import java.awt.BorderLayout;
 import java.awt.EventQueue;
-
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.border.EmptyBorder;
 import javax.swing.JButton;
-
 import java.awt.event.ActionListener;
 import java.awt.event.ActionEvent;
-
 import javax.swing.JTextField;
 import javax.swing.JPasswordField;
 import javax.swing.JLabel;
-
 import java.awt.Color;
-import java.io.IOException;
 import java.util.ArrayList;
-
 import javax.swing.JTextPane;
 
 
@@ -340,7 +333,7 @@ public class GUI extends JFrame {
             }
         });   
         
-      //ActionListerner für btnLogout
+      //ActionListerner für btnAbrufen
         btnAbrufen.addActionListener(new ActionListener() {
             
             public void actionPerformed(ActionEvent e)
@@ -348,8 +341,10 @@ public class GUI extends JFrame {
             	//Execute when button is pressed
                 System.out.println("You clicked the button Abrufen");
                 ArrayList<String[]> messages = usecases.receiveMessage(txtName.getText());
-                txtAbsender.setText(messages.get(0)[0]);
-        		txtpnEmpfnachricht.setText(messages.get(0)[1]);
+                if(messages != null) {
+	                txtAbsender.setText(messages.get(0)[0]);
+	        		txtpnEmpfnachricht.setText(messages.get(0)[1]);
+                }
             }
         });
        

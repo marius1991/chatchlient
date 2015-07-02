@@ -78,7 +78,6 @@ public class UseCases {
 		byte[] privkey_user_enc = encryptAESECB(masterkey, privateKeyByte);
 		
 		String value = "{\"name\":\"" +name+ "\",\"salt_master_key\":\"" + DatatypeConverter.printHexBinary(salt_masterkey).toLowerCase() + "\",\"public_key\":\"" +publickey64+ "\",\"private_key_enc\":\"" + DatatypeConverter.printHexBinary(privkey_user_enc).toLowerCase() + "\"}";
-		System.out.println(value);
 		
 		//Verbindung zum Server herstellen
 		HttpConnection con = new HttpConnection();
@@ -92,6 +91,7 @@ public class UseCases {
 		
 		//Logausgabe
 		System.out.println("Übergabestring: " + value);
+		System.out.println("Rückgabesting: " + success);
 		System.out.println("PrivateKey vor der Verschlüsselung: " + DatatypeConverter.printHexBinary(privateKeyByte).toLowerCase());
 		System.out.println("PrivateKey nach der Verschlüsselung: " + DatatypeConverter.printHexBinary(privkey_user_enc).toLowerCase());
 		
@@ -122,7 +122,7 @@ public class UseCases {
 			// Auto-generated catch block
 			e.printStackTrace();
 		}
-		System.out.println("Rückgabe: " + success);
+		System.out.println("Rückgabesting: " + success);
 		
 		//String in JSON umwandeln und Daten extrahieren
 		JsonHandler jHandler = new JsonHandler();	
@@ -163,7 +163,7 @@ public class UseCases {
 			// Auto-generated catch block
 			e.printStackTrace();
 		}
-		System.out.println("Rückgabe: " + success);
+		System.out.println("Rückgabesting: " + success);
 		if (jHandler.extraxtString(jHandler.convert(success), "public_key").equals("")) {
 			String status = jHandler.extraxtString(jHandler.convert(success), "status");
 			return status;
@@ -192,8 +192,6 @@ public class UseCases {
 			System.out.println("");
 			byte[] nachricht = nachrichtparam.getBytes();
 			byte[] pubkey_recipient = DatatypeConverter.parseHexBinary(status);
-//			System.out.println("PublicKey von " + recipientName + ": " + status);
-			System.out.println("Nachricht: " + new String(nachricht));
 			
 			//Symmetrischen Schlüssel bilden
 			KeyGenerator kg = null;
@@ -217,7 +215,6 @@ public class UseCases {
 
 			//Nachricht verschlüsseln
 			byte[] cipher = encryptAESCBC(nachricht, pubkey_recipient, iv, key_recipient_secret);
-			System.out.println("cipher: " + DatatypeConverter.printHexBinary(cipher).toLowerCase());
 			
 			//key_recipient mit Public Key verschlüsseln
 			byte[] key_recipient_enc = encryptRSAPubKey(pubkey_recipient, key_recipient);
@@ -235,15 +232,12 @@ public class UseCases {
 			}
 			md.update(textBytes); // Change this to "UTF-16" if needed
 			byte[] sig_recipient = md.digest();
-			System.out.println("-sig_recipient: " + DatatypeConverter.printHexBinary(sig_recipient).toLowerCase());
 			//Verschlüsselung des Hashes mit dem Private Key
 			byte[] sig_recipient_enc = encryptRSAPrivKey(privkey_user, sig_recipient);
-			System.out.println("-sig_recipient_enc: " + DatatypeConverter.printHexBinary(sig_recipient_enc).toLowerCase());
 			
 			//Unix-Zeit
 			Long unixTime = System.currentTimeMillis() / 1000L;
 			String timestamp = unixTime.toString();
-			//System.out.println("Timestamp: " + timestamp);
 			
 			//Bildung von SHA-256 Hash für sig_service
 			String text1 = timestamp + recipientName + name + DatatypeConverter.printHexBinary(cipher).toLowerCase() + DatatypeConverter.printHexBinary(iv).toLowerCase() + DatatypeConverter.printHexBinary(key_recipient_enc).toLowerCase() + DatatypeConverter.printHexBinary(sig_recipient_enc).toLowerCase();
@@ -258,16 +252,12 @@ public class UseCases {
 			md1.update(text1Bytes); // Change this to "UTF-16" if needed
 			byte[] sig_service = md1.digest();
 			String hexSig_service = DatatypeConverter.printHexBinary(sig_service).toLowerCase();
-			System.out.println("HEX: " + hexSig_service);
 			
 			//Verschlüsselung des Hashes mit dem Private Key
 			byte[] sig_service_enc = encryptRSAPrivKey(privkey_user, hexSig_service.getBytes());
-			System.out.println("-sig_service: " + DatatypeConverter.printHexBinary(sig_service_enc).toLowerCase());
 			String sig_service_enc64 = new String(DatatypeConverter.printBase64Binary(sig_service_enc));
-			System.out.println("-sig_service_enc64: " + sig_service_enc64);
 			
 			String value = "{\"name\":\"" +name+ "\",\"cipher\":\"" + DatatypeConverter.printHexBinary(cipher).toLowerCase() + "\",\"iv\":\"" + DatatypeConverter.printHexBinary(iv).toLowerCase() + "\",\"key_recipient_enc\":\"" + DatatypeConverter.printHexBinary(key_recipient_enc).toLowerCase() + "\",\"sig_recipient\":\"" + DatatypeConverter.printHexBinary(sig_recipient_enc).toLowerCase() + "\",\"timestamp\":\"" +timestamp+ "\",\"recipientname\":\"" +recipientName+ "\",\"sig_service\":\"" +sig_service_enc64+ "\"}";
-			System.out.println("ÜbergabeString: " + value);
 			
 			//Verbindung zum Server herstellen
 			HttpConnection con = new HttpConnection();
@@ -278,8 +268,9 @@ public class UseCases {
 				// Auto-generated catch block
 				e.printStackTrace();
 			}
+			System.out.println("Übergabestring: " + value);
+			System.out.println("Rückgabesting: " + success);
 
-			
 			return 1;
 		}
 	}
@@ -292,11 +283,9 @@ public class UseCases {
 		//Unix-Zeit
 		Long unixTime = System.currentTimeMillis() / 1000L;
 		String timestamp = unixTime.toString();
-		//System.out.println("Timestamp: " + timestamp);
 		
 		//SHA256 Hash bilden
 		String text = name + timestamp;
-		System.out.println("STRING: " + text);
 		byte [] textBytes = text.getBytes();
 		MessageDigest md = null;
 		try {
@@ -308,19 +297,15 @@ public class UseCases {
 		md.update(textBytes); // Change this to "UTF-16" if needed
 		byte[] signature = md.digest();
 		String hexSignature = DatatypeConverter.printHexBinary(signature).toLowerCase();
-		System.out.println("HEX: " + hexSignature);
 		
 		//Verschlüsselung des Hashes mit dem Private Key
 		byte[] signature_enc = encryptRSAPrivKey(privkey_user, hexSignature.getBytes());
-		System.out.println("-signature: " + DatatypeConverter.printHexBinary(signature_enc).toLowerCase());
 		String signature_enc64 = new String(DatatypeConverter.printBase64Binary(signature_enc));
-		System.out.println("-signature_enc64: " + signature_enc64);
 	
 		//Verbindung zum Server herstellen
 		String success = "";
 		JsonHandler jHandler = new JsonHandler();
 		String value = "{\"timestamp\":\"" + timestamp + "\",\"signature\":\"" + signature_enc64 + "\"}";
-		System.out.println(value);
 		String url = "/users/" + name + "/messages";
 		HttpConnection http = new HttpConnection();
 		try {
@@ -329,8 +314,15 @@ public class UseCases {
 			// TODO Auto-generated catch block
 			e1.printStackTrace();
 		}
-		System.out.println(success);
+		System.out.println("Übergabestring: " + value);
+		System.out.println("Rückgabesting: " + success);
 		String json = null;
+		
+		if(success.equals("{\"status\":\"5\"}")) {
+			System.out.println("keine Nachrichten vorhanen!");
+			return null;
+		}
+		
 		if(success.substring(0, 1).equals("[")) {
 			json = success.substring(1, success.length()-1);
 		}
@@ -345,14 +337,11 @@ public class UseCases {
 		byte[] key_recipient_enc = DatatypeConverter.parseHexBinary(key_recipient_encString);
 		byte[] cipher = DatatypeConverter.parseHexBinary(cipherString);
 		byte[] iv = DatatypeConverter.parseHexBinary(ivString);
-		System.out.println("key_recipient_enc: " + key_recipient_encString);
-		System.out.println("cipher: " + cipherString);
-		System.out.println("iv: " + ivString);
 
 		//key_recipient_enc entschlüsseln
 		byte[] key_recipient = decryptRSAPrivKey(privkey_user, key_recipient_enc);
-		System.out.println("key_recipient: " + DatatypeConverter.printHexBinary(key_recipient).toLowerCase());
 		
+		//Cipher entschlüsseln
 		byte[] nachricht = decryptAESCBC(cipher, key_recipient, iv);
 		System.out.println("Nachricht: " + new String(nachricht));
 		String message[] = {sender,new String(nachricht)};
